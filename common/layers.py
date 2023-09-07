@@ -24,6 +24,7 @@ class Relu:
 
 # Sigmoid layer is a layer that applies the sigmoid function to the input
 # Sigmoid is a function that returns a value between 0 and 1
+# Sigmoid is used for binary classification (can be used for Discriminator)
 class Sigmoid:
     def __init__(self):
         self.out = None
@@ -55,6 +56,7 @@ class Affine:
     def forward(self, x):
         # 텐서 대응
         self.original_x_shape = x.shape
+        # this is used to flatten the input
         x = x.reshape(x.shape[0], -1)
         self.x = x
 
@@ -203,3 +205,41 @@ class BatchNormalization:
         
         return dx
 
+class Tanh():
+    def __init__(self):
+        self.out = None
+
+    def forward(self, x):
+        out = np.tanh(x)
+        self.out = out
+
+        return out
+
+    def backward(self, dout):
+        dx = dout * (1 - self.out ** 2)
+
+        return dx
+
+
+class BCELoss:
+    def __init__(self):
+        self.y_pred = None
+        self.y_true = None
+
+    def forward(self, y_pred, y_true):
+        self.y_pred = y_pred
+        self.y_true = y_true
+        epsilon = 1e-15
+        y_pred = np.clip(y_pred, epsilon, 1 - epsilon)
+        loss = np.mean(-(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred)))
+        return loss
+
+    # backward gives us the gradient of the loss with respect to the input
+    def backward(self):
+        # Compute the gradient of BCE loss with respect to y_pred
+        epsilon = 1e-15
+        self.y_pred = np.clip(self.y_pred, epsilon, 1 - epsilon)
+        gradient = (self.y_pred - self.y_true) / (self.y_pred * (1 - self.y_pred))
+        
+        # Ensure the gradient has the same shape as y_pred
+        return gradient

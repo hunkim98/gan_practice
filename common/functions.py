@@ -59,3 +59,18 @@ def cross_entropy_error(y, t):
 def softmax_loss(X, t):
     y = softmax(X)
     return cross_entropy_error(y, t)
+
+def binary_cross_entropy_error(y, t):
+    epsilon = 1e-15
+    y = np.clip(y, epsilon, 1 - epsilon)
+    
+    return np.mean(-(t * np.log(y) + (1 - t) * np.log(1 - y)))
+
+def binary_cross_entropy_gradient(y, t):
+    epsilon = 1e-15
+    y = np.clip(y, epsilon, 1 - epsilon)
+    
+    return (y - t) / (y * (1 - y))
+
+def reshape_sum_backward(dout, x_shape):
+    return dout.reshape(x_shape)

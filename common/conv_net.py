@@ -136,6 +136,8 @@ class SimpleConvNet:
         # we divide the number of correct predictions by the number of data to get the accuracy
         return acc / x.shape[0]
     
+
+
     def gradient(self, x, t):
         # forward
         self.loss(x, t)
