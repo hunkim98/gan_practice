@@ -14,3 +14,5 @@
 10. straight: Gothic_A1
 11. strong: Black_Han_Sans
 12. warm: Gowun_Batang
+
+the base is [NotosansKR](https://fonts.google.com/noto/specimen/Noto+Sans+KR).
