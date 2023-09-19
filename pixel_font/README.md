@@ -1,5 +1,9 @@
 ## Gathered Korean fonts
 
+model references
+https://kaonashi-tyc.github.io/2017/04/06/zi2zi.html
+https://github.com/hologerry/Attr2Font
+
 12 Korean fonts are gathered from [Google Fonts](https://fonts.google.com/).
 
 1. brush: Nanum_Brush_Script
