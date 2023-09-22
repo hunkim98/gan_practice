@@ -5,6 +5,8 @@ from model import Generator, Discriminator
 from dataloader import PixelCharacterDataset, DataLoader
 from matplotlib import pyplot as plt
 
+torch.manual_seed(111)
+
 def init_weights(m):
     if type(m) == nn.ConvTranspose2d:
         nn.init.normal_(m.weight, 0.0, 0.02)
@@ -12,7 +14,7 @@ def init_weights(m):
         nn.init.normal_(m.weight, 1.0, 0.02)
         nn.init.constant_(m.bias, 0)
         
-def plot_images(imgs, grid_size = 5):
+def plot_images(imgs, grid_size = 5, epoch = 0):
     """
     imgs: vector containing all the numpy images
     grid_size: 2x2 or 5x5 grid containing images
@@ -20,13 +22,15 @@ def plot_images(imgs, grid_size = 5):
      
     fig = plt.figure(figsize = (8, 8))
     columns = rows = grid_size
-    plt.title("Training Images")
+    plt.title(f"Training Images at epoch {epoch}")
 
     for i in range(1, columns*rows +1):
+        if i >= len(imgs):
+            break
         plt.axis("off")
         fig.add_subplot(rows, columns, i)
         plt.imshow(imgs[i])
-    plt.savefig("training_images.png")
+    plt.savefig(f"epoch/training_images_{epoch}.png")
 
 device = ""
 if torch.cuda.is_available():
@@ -34,14 +38,13 @@ if torch.cuda.is_available():
 else:
     device = torch.device("cpu")
 
-torch.manual_seed(111)
 
 generator = Generator().to(device)
 discriminator = Discriminator().to(device)
 generator.apply(init_weights)
 discriminator.apply(init_weights)
 
-imgs = np.load('8bit_characters_32x32.npz')
+imgs = np.load('8bit_characters_50x50.npz')
 transpose_imgs = np.transpose(
     np.float32(imgs['arr_0']), (0, 3, 1, 2)
 )
@@ -50,7 +53,7 @@ dset = PixelCharacterDataset(transpose_imgs)
 dataloader = DataLoader(dset, batch_size=32, shuffle=True)
 
 lr = 0.001 # learning rate
-num_epochs = 5000 # number of epochs
+num_epochs = 10000 # number of epochs
 def backward_hook(grad):
     print(grad)
 loss_function = nn.BCELoss() # Binary Cross Entropy Loss (since we are doing binary classification - whether the data is real or fake)
@@ -128,12 +131,15 @@ for e in range(num_epochs):
         ####################################
  
         # during every epoch, print images at every 10th iteration.
-        if i % 10 == 0:
+        if e % 10 == 0 and i == len(dataloader) - 1:
             # convert the fake images from (b_size, 3, 32, 32) to (b_size, 32, 32, 3) for plotting 
             img_plot = np.transpose(fake_img.detach().cpu(), (0,2,3,1)) # .detach().cpu() is imp for copying fake_img tensor to host memory first
             img_plot = (img_plot + 1)/2
             print("********************")
             print(" Epoch %d and iteration %d " % (e, i))
+            print("Discriminator loss: %f" % (loss_disc))
+            print("Generator loss: %f" % (loss_gen))
+            plot_images(img_plot, grid_size=5, epoch=e)
 
 
 torch.save(generator.state_dict(), "generator.pth")
@@ -142,4 +148,3 @@ torch.save(discriminator.state_dict(), "discriminator.pth")
 generated = generator(torch.randn(32, 100, 1, 1, device = device))
 img_plot = np.transpose(generated.detach().cpu(), (0,2,3,1))
 img_plot = (img_plot + 1)/2
-plot_images(img_plot, grid_size=5)
