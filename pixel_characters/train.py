@@ -31,6 +31,8 @@ def plot_images(imgs, grid_size = 5, epoch = 0):
         fig.add_subplot(rows, columns, i)
         plt.imshow(imgs[i])
     plt.savefig(f"epoch/training_images_{epoch}.png")
+    plt.show()
+    plt.close()
 
 device = ""
 if torch.cuda.is_available():
@@ -131,9 +133,10 @@ for e in range(num_epochs):
         ####################################
  
         # during every epoch, print images at every 10th iteration.
-        if e % 10 == 0 and i == len(dataloader) - 1:
+        if e % 10 == 0 and i == len(dataloader)-1:
             # convert the fake images from (b_size, 3, 32, 32) to (b_size, 32, 32, 3) for plotting 
-            img_plot = np.transpose(fake_img.detach().cpu(), (0,2,3,1)) # .detach().cpu() is imp for copying fake_img tensor to host memory first
+            generated = generator(torch.randn(32, 100, 1, 1, device = device))
+            img_plot = np.transpose(generated.detach().cpu(), (0,2,3,1))
             img_plot = (img_plot + 1)/2
             print("********************")
             print(" Epoch %d and iteration %d " % (e, i))
@@ -144,7 +147,3 @@ for e in range(num_epochs):
 
 torch.save(generator.state_dict(), "generator.pth")
 torch.save(discriminator.state_dict(), "discriminator.pth")
-
-generated = generator(torch.randn(32, 100, 1, 1, device = device))
-img_plot = np.transpose(generated.detach().cpu(), (0,2,3,1))
-img_plot = (img_plot + 1)/2
