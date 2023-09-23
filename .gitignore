@@ -1,3 +1,5 @@
 .venv
 data
 .npz
+results
+.svenv
