@@ -4,6 +4,7 @@ from torch import nn
 from model import Generator, Discriminator
 from dataloader import PixelCharacterDataset, DataLoader
 from matplotlib import pyplot as plt
+from Diff_Augment import DiffAugment
 
 torch.manual_seed(111)
 
@@ -37,8 +38,11 @@ def plot_images(imgs, grid_size = 5, epoch = 0):
 device = ""
 if torch.cuda.is_available():
     device = torch.device("cuda")
+    print(device.type)
+    print(device.index)
 else:
     device = torch.device("cpu")
+device = torch.device("cpu")
 
 
 generator = Generator().to(device)
@@ -55,7 +59,7 @@ dset = PixelCharacterDataset(transpose_imgs)
 dataloader = DataLoader(dset, batch_size=32, shuffle=True)
 
 lr = 0.001 # learning rate
-num_epochs = 10000 # number of epochs
+num_epochs = 1000 # number of epochs
 def backward_hook(grad):
     print(grad)
 loss_function = nn.BCELoss() # Binary Cross Entropy Loss (since we are doing binary classification - whether the data is real or fake)
@@ -64,12 +68,14 @@ loss_function = nn.BCELoss() # Binary Cross Entropy Loss (since we are doing bin
 optimizer_discriminator = torch.optim.Adam(discriminator.parameters(), lr=lr, betas=(0.5, 0.999))
 optimizer_generator = torch.optim.Adam(generator.parameters(), lr=lr, betas=(0.5, 0.999))
 
+diff_policy='color,cutout'
+
 # going over the entire dataset 10 times
 for e in range(num_epochs):
      
     # pick each batch b of input images: shape of each batch is (32, 3, 32, 32)
     for i, b in enumerate(dataloader):
- 
+
         ##########################
         ## Update Discriminator ##
         ##########################
@@ -79,9 +85,10 @@ for e in range(num_epochs):
         # clear the gradient
         optimizer_discriminator.zero_grad() # set the gradients to 0 at start of each loop because gradients are accumulated on subsequent backward passes
         # compute the D model output
-        yhat = discriminator(b.to(device)).view(-1) # view(-1) reshapes a 4-d tensor of shape (2,1,1,1) to 1-d tensor with 2 values only
+        b_t = DiffAugment(b, policy=diff_policy)
+        yhat = discriminator(b_t.to(device)).view(-1) # view(-1) reshapes a 4-d tensor of shape (2,1,1,1) to 1-d tensor with 2 values only
         # specify target labels or true labels
-        target = torch.ones(len(b), dtype=torch.float, device=device)
+        target = torch.ones(len(b_t), dtype=torch.float, device=device)
         # calculate loss
         loss_real = loss_function(yhat, target)
         # calculate gradients -  or rather accumulation of gradients on loss tensor
@@ -91,14 +98,15 @@ for e in range(num_epochs):
  
         # generate batch of fake images using G
         # Step1: creating noise to be fed as input to G
-        noise = torch.randn(len(b), 100, 1, 1, device = device)
+        noise = torch.randn(len(b_t), 100, 1, 1, device = device)
         # Step 2: feed noise to G to create a fake img (this will be reused when updating G)
         fake_img = generator(noise) 
+        fake_img = DiffAugment(fake_img, policy=diff_policy)
  
         # compute D model output on fake images
-        yhat = discriminator.cuda()(fake_img.detach()).view(-1) # .cuda() is essential because our input i.e. fake_img is on gpu but model isnt (runtimeError thrown); detach is imp: Basically, only track steps on your generator optimizer when training the generator, NOT the discriminator. 
+        yhat = discriminator(fake_img.detach()).view(-1).to(device) # .cuda() is essential because our input i.e. fake_img is on gpu but model isnt (runtimeError thrown); detach is imp: Basically, only track steps on your generator optimizer when training the generator, NOT the discriminator. 
         # specify target labels
-        target = torch.zeros(len(b), dtype=torch.float, device=device)
+        target = torch.zeros(len(b_t), dtype=torch.float, device=device)
         # calculate loss
         loss_fake = loss_function(yhat, target)
         # calculate gradients
@@ -117,7 +125,7 @@ for e in range(num_epochs):
         # clear gradient
         optimizer_generator.zero_grad()
         # pass fake image through D
-        yhat = discriminator.cuda()(fake_img).view(-1)
+        yhat = discriminator(fake_img).view(-1).to(device)
         # specify target variables - remember G wants D *to think* these are real images so label is 1
         target = torch.ones(len(b), dtype=torch.float, device=device)
         # calculate loss
@@ -133,7 +141,7 @@ for e in range(num_epochs):
         ####################################
  
         # during every epoch, print images at every 10th iteration.
-        if e % 10 == 0 and i == len(dataloader)-1:
+        if i % 16 == 0:
             # convert the fake images from (b_size, 3, 32, 32) to (b_size, 32, 32, 3) for plotting 
             generated = generator(torch.randn(32, 100, 1, 1, device = device))
             img_plot = np.transpose(generated.detach().cpu(), (0,2,3,1))
