@@ -6,7 +6,7 @@ from dataloader import PixelCharacterDataset, DataLoader
 from matplotlib import pyplot as plt
 from Diff_Augment import DiffAugment
 
-torch.manual_seed(111)
+torch.manual_seed(112)
 
 def init_weights(m):
     if type(m) == nn.ConvTranspose2d:
@@ -15,7 +15,7 @@ def init_weights(m):
         nn.init.normal_(m.weight, 1.0, 0.02)
         nn.init.constant_(m.bias, 0)
         
-def plot_images(imgs, grid_size = 5, epoch = 0):
+def plot_images(imgs, grid_size = 10, epoch = 0, loss = 0):
     """
     imgs: vector containing all the numpy images
     grid_size: 2x2 or 5x5 grid containing images
@@ -23,7 +23,7 @@ def plot_images(imgs, grid_size = 5, epoch = 0):
      
     fig = plt.figure(figsize = (8, 8))
     columns = rows = grid_size
-    plt.title(f"Training Images at epoch {epoch}")
+    plt.title(f"Training Images at epoch {epoch}, loss: {loss}")
 
     for i in range(1, columns*rows +1):
         if i >= len(imgs):
@@ -31,7 +31,7 @@ def plot_images(imgs, grid_size = 5, epoch = 0):
         plt.axis("off")
         fig.add_subplot(rows, columns, i)
         plt.imshow(imgs[i])
-    plt.savefig(f"epoch/training_images_{epoch}.png")
+    plt.savefig(f"epoch/training_images_epoch:{epoch}_loss:{loss}.png")
     plt.show()
     plt.close()
 
@@ -42,7 +42,6 @@ if torch.cuda.is_available():
     print(device.index)
 else:
     device = torch.device("cpu")
-device = torch.device("cpu")
 
 
 generator = Generator().to(device)
@@ -56,7 +55,9 @@ transpose_imgs = np.transpose(
 )
 dset = PixelCharacterDataset(transpose_imgs)
 
-dataloader = DataLoader(dset, batch_size=32, shuffle=True)
+batch_size = 32
+
+dataloader = DataLoader(dset, batch_size=batch_size, shuffle=True)
 
 lr = 0.001 # learning rate
 num_epochs = 1000 # number of epochs
@@ -70,11 +71,20 @@ optimizer_generator = torch.optim.Adam(generator.parameters(), lr=lr, betas=(0.5
 
 diff_policy='color,cutout'
 
+
+# return
+
+loss_threshold = 2
 # going over the entire dataset 10 times
 for e in range(num_epochs):
-     
-    # pick each batch b of input images: shape of each batch is (32, 3, 32, 32)
+    # pick each batch b of input images: shape of each batch is (32, 3, 50, 50)
     for i, b in enumerate(dataloader):
+
+        # b.shape[0] is the batch size
+        # there is a possibility where the last batch in an epoch has a different batch size than the other batches
+        # this is because the total number of images in the dataset is not a multiple of the batch size
+        if b.shape[0] != batch_size:
+            continue
 
         ##########################
         ## Update Discriminator ##
@@ -140,18 +150,23 @@ for e in range(num_epochs):
         #### Plot some Generator images ####
         ####################################
  
+        if loss_gen < loss_threshold:
+            torch.save(generator.state_dict(), f"generator_epoch:{e}.pth")
+            torch.save(discriminator.state_dict(), f"discriminator_epoch:{e}.pth")
+            loss_threshold = loss_gen
+
         # during every epoch, print images at every 10th iteration.
-        if i % 16 == 0:
+        if e % 10 == 0 and i == len(dataloader)-3:
             # convert the fake images from (b_size, 3, 32, 32) to (b_size, 32, 32, 3) for plotting 
-            generated = generator(torch.randn(32, 100, 1, 1, device = device))
+            generated = generator(torch.randn(batch_size, 100, 1, 1, device = device))
             img_plot = np.transpose(generated.detach().cpu(), (0,2,3,1))
             img_plot = (img_plot + 1)/2
             print("********************")
             print(" Epoch %d and iteration %d " % (e, i))
             print("Discriminator loss: %f" % (loss_disc))
             print("Generator loss: %f" % (loss_gen))
-            plot_images(img_plot, grid_size=5, epoch=e)
+            plot_images(img_plot, grid_size=5, epoch=e, loss=loss_gen)
 
 
-torch.save(generator.state_dict(), "generator.pth")
-torch.save(discriminator.state_dict(), "discriminator.pth")
+# torch.save(generator.state_dict(), "generator.pth")
+# torch.save(discriminator.state_dict(), "discriminator.pth")
