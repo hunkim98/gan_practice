@@ -190,12 +190,21 @@ for epoch in range(max_epoch):
             epoch_dt = epoch + cnt / dataloader.max_iter
             print('epoch: {:.2f}, loss_d: {:.4f}, loss_g: {:.4f}'.format(
                 epoch_dt, loss_d.data, loss_g.data))
-            test_gen = generate_image(epoch, loss_g.data)
+            generate_image(epoch, loss_g.data)
+            with dezero.test_mode():
+                test_diff = gen(xp.random.randn(32,100, 1, 1))
+
+            img_diff = cuda.as_numpy(test_diff.data)
+            img_diff = (img_diff + 1)/2
+            img_diff = np.transpose(img_diff, (0, 2, 3, 1))
             # diff = 0
-            diff = black_diff(test_gen, sample_data)
+            real_diff = cuda.as_numpy(x)
+            real_diff = (real_diff + 1)/2
+            real_diff = np.transpose(real_diff, (0, 2, 3, 1))
+            diff = black_diff(img_diff, real_diff)
 
             print("black diff between real sample: ", diff)
-            if diff < min_diff and epoch > 20:
+            if diff < min_diff and epoch > 150:
                 min_diff = diff
                 print('saving weights')
                 gen.save_weights(f'parameters_manual/gen_manual_epoch:{epoch}.npz')
