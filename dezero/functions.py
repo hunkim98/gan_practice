@@ -156,7 +156,9 @@ class GetItemGrad(Function):
         if xp is np:
             np.add.at(gx, self.slices, gy)
         else:
-            xp.scatter_add(gx, self.slices, gy)
+            import cupyx
+            cupyx.scatter_add(gx, self.slices, gy)
+            # xp.scatter_add(gx, self.slices, gy)
         return gx
 
     def backward(self, ggx):
@@ -202,6 +204,21 @@ class Sum(Function):
 
 def sum(x, axis=None, keepdims=False):
     return Sum(axis, keepdims)(x)
+
+class Abs(Function):
+    def forward(self, x):
+        xp = dezero.cuda.get_array_module(x)
+        y = xp.abs(x)
+        return y
+
+    def backward(self, gy):
+        x, = self.inputs
+        xp = cuda.get_array_module(x)
+        gx = gy * x / xp.abs(x)
+        return gx
+
+def abs(x):
+    return Abs()(x)
 
 
 class SumTo(Function):
@@ -434,8 +451,7 @@ class MeanSquaredError(Function):
         gx0 = gy * diff * (2. / len(diff))
         gx1 = -gx0
         return gx0, gx1
-
-
+    
 def mean_squared_error(x0, x1):
     return MeanSquaredError()(x0, x1)
 
@@ -488,6 +504,11 @@ def sigmoid_cross_entropy(x, t):
     y = -1 * sum(tlog_p) / N
     return y
 
+def l1_loss(x, t):
+    diff = x - t
+    y = abs(diff).sum()
+    return y
+
 
 def binary_cross_entropy(p, t):
     if p.ndim != t.ndim:
@@ -525,7 +546,6 @@ def dropout(x, dropout_ratio=0.5):
         return y
     else:
         return x
-
 
 class BatchNorm(Function):
     def __init__(self, mean, var, decay, eps):

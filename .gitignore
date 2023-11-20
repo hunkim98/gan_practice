@@ -8,3 +8,7 @@ pokemon
 epoch
 epoch_manual
 parameters_manual
+model
+.venv2
+a_images.npy
+b_images.npy
